@@ -1,0 +1,984 @@
+"use client";
+
+import { useState, useMemo, useRef } from "react";
+
+// ─── Data ─────────────────────────────────────────────────────────────────────
+
+type Category =
+  | "CPU"
+  | "GPU"
+  | "Memory"
+  | "Storage"
+  | "Power"
+  | "Networking"
+  | "Display"
+  | "General";
+
+interface Term {
+  term: string;
+  category: Category;
+  definition: string;
+  matters: string;
+}
+
+const TERMS: Term[] = [
+  // CPU
+  {
+    term: "CPU",
+    category: "CPU",
+    definition:
+      "Central Processing Unit — the primary chip that executes program instructions using a fetch-decode-execute cycle.",
+    matters:
+      "Every program you run depends on CPU speed. More cores help multitasking; higher clock speeds help gaming.",
+  },
+  {
+    term: "Core",
+    category: "CPU",
+    definition:
+      "An independent processing unit within a CPU die. Modern CPUs have 6–24 cores for consumer use.",
+    matters:
+      "More cores = better multitasking and parallel workloads like video encoding.",
+  },
+  {
+    term: "Thread",
+    category: "CPU",
+    definition:
+      "A virtual core created by Hyper-Threading (Intel) or SMT (AMD) allowing one physical core to handle two instruction streams.",
+    matters:
+      "Doubles the number of tasks a CPU can handle simultaneously without doubling transistor count.",
+  },
+  {
+    term: "Clock Speed",
+    category: "CPU",
+    definition:
+      "The number of cycles a CPU executes per second, measured in GHz. Modern CPUs boost between 3.5–6.0 GHz.",
+    matters:
+      "Higher clock = faster single-threaded performance. Gaming depends heavily on this.",
+  },
+  {
+    term: "Boost Clock",
+    category: "CPU",
+    definition:
+      "The maximum turbo frequency a CPU reaches on lightly threaded workloads when power and thermal headroom allow.",
+    matters:
+      "Real-world gaming speed. Sustained boost requires adequate cooling.",
+  },
+  {
+    term: "TDP",
+    category: "CPU",
+    definition:
+      "Thermal Design Power — the heat a cooler must dissipate to keep the CPU at spec. Measured in watts.",
+    matters:
+      "Determines what cooler you need. Higher TDP = hotter chip = louder or bigger cooler required.",
+  },
+  {
+    term: "IPC",
+    category: "CPU",
+    definition:
+      "Instructions Per Clock — how much work a CPU completes in a single cycle. Higher IPC = faster per GHz.",
+    matters:
+      "IPC improvements let newer CPUs beat older ones at lower clock speeds.",
+  },
+  {
+    term: "Cache",
+    category: "CPU",
+    definition:
+      "Ultra-fast on-chip SRAM memory in L1, L2, and L3 tiers. L1 is fastest (KB range), L3 is largest (MB range).",
+    matters:
+      "Cache reduces latency for frequently accessed data. AMD 3D V-Cache dramatically boosts gaming.",
+  },
+  {
+    term: "Socket",
+    category: "CPU",
+    definition:
+      "The physical interface between CPU and motherboard. AM5 (AMD) and LGA1700 (Intel) are current standards.",
+    matters:
+      "CPU and motherboard must share the same socket — they are not interchangeable.",
+  },
+  {
+    term: "IMC",
+    category: "CPU",
+    definition:
+      "Integrated Memory Controller — the circuit inside the CPU that manages RAM communication. Replaced the North Bridge.",
+    matters:
+      "IMC quality determines maximum stable RAM speed and affects latency.",
+  },
+  {
+    term: "Die",
+    category: "CPU",
+    definition:
+      "The actual silicon chip containing transistors. A CPU package may contain one or more dies (chiplets).",
+    matters:
+      "Smaller die process nodes (nm) = more transistors = better efficiency.",
+  },
+  {
+    term: "Chiplet",
+    category: "CPU",
+    definition:
+      "A modular CPU design where separate dies (compute, I/O) are combined in one package. Used in AMD Ryzen.",
+    matters:
+      "Chiplets improve yields and allow mixing process nodes for cost efficiency.",
+  },
+  {
+    term: "Binning",
+    category: "CPU",
+    definition:
+      "The process of testing chips after fabrication and sorting them by quality. Better chips become higher-SKU products.",
+    matters:
+      "Explains why the i9 and i5 come from the same wafer — the i9 just passed stricter tests.",
+  },
+  {
+    term: "Overclocking",
+    category: "CPU",
+    definition:
+      "Running a CPU above its rated clock speed by increasing voltage and multiplier settings in BIOS.",
+    matters:
+      "Free performance but voids warranty, increases heat, and risks instability.",
+  },
+  {
+    term: "VRM",
+    category: "CPU",
+    definition:
+      "Voltage Regulator Module — converts 12V PSU power to the precise low voltage (0.7–1.5V) the CPU needs.",
+    matters:
+      "Weak VRMs throttle CPUs under load. Essential for high-TDP CPUs and overclocking.",
+  },
+
+  // GPU
+  {
+    term: "GPU",
+    category: "GPU",
+    definition:
+      "Graphics Processing Unit — a massively parallel processor designed to render images and handle compute workloads.",
+    matters:
+      "The single most important component for gaming performance and visual quality.",
+  },
+  {
+    term: "VRAM",
+    category: "GPU",
+    definition:
+      "Video RAM — dedicated high-bandwidth memory on the GPU storing textures, frame buffers, and geometry data.",
+    matters:
+      "Running out of VRAM causes severe stuttering. 4K gaming needs 12GB+, future titles need 16GB+.",
+  },
+  {
+    term: "CUDA Cores",
+    category: "GPU",
+    definition:
+      "NVIDIA's name for shader processors — the parallel computing units that execute rendering calculations.",
+    matters:
+      "More CUDA cores generally means more throughput, but architecture matters more than raw count.",
+  },
+  {
+    term: "Stream Processors",
+    category: "GPU",
+    definition:
+      "AMD's equivalent of CUDA cores — shader processors in RDNA architecture GPUs.",
+    matters:
+      "Same principle as CUDA cores. Compare GPUs within the same generation for meaningful numbers.",
+  },
+  {
+    term: "Ray Tracing",
+    category: "GPU",
+    definition:
+      "A rendering technique simulating real light physics by tracing rays from the camera into the scene.",
+    matters:
+      "Dramatically improves lighting and reflections but is GPU-intensive. Needs RTX 30/40 or RX 6000+ for playable fps.",
+  },
+  {
+    term: "Rasterization",
+    category: "GPU",
+    definition:
+      "The traditional rendering method converting 3D geometry to 2D pixels. Faster than ray tracing.",
+    matters:
+      "Still the basis of most games. GPU benchmarks primarily measure rasterization performance.",
+  },
+  {
+    term: "DLSS",
+    category: "GPU",
+    definition:
+      "Deep Learning Super Sampling — NVIDIA's AI upscaling that renders at lower resolution and upscales to target.",
+    matters:
+      "Dramatically boosts fps with minimal visual quality loss. DLSS 3.5 adds frame generation.",
+  },
+  {
+    term: "FSR",
+    category: "GPU",
+    definition:
+      "FidelityFX Super Resolution — AMD's open-source spatial upscaling technology, works on any GPU.",
+    matters:
+      "Free fps boost available to all GPU brands. FSR 3 adds frame generation like DLSS 3.",
+  },
+  {
+    term: "PCIe",
+    category: "GPU",
+    definition:
+      "Peripheral Component Interconnect Express — the high-speed serial bus connecting GPU to CPU. Current standard is PCIe 5.0.",
+    matters:
+      "PCIe 4.0 x16 provides 64 GB/s. Real-world GPU performance difference between 3.0 and 4.0 is minimal.",
+  },
+  {
+    term: "Framebuffer",
+    category: "GPU",
+    definition:
+      "A region of VRAM storing the current rendered frame before it is sent to the display.",
+    matters: "Double/triple buffering reduces screen tearing and input lag.",
+  },
+
+  // Memory
+  {
+    term: "RAM",
+    category: "Memory",
+    definition:
+      "Random Access Memory — volatile DRAM that stores actively used data for the CPU. Loses all content when powered off.",
+    matters:
+      "More RAM allows more apps open simultaneously. 16GB is minimum for gaming, 32GB recommended.",
+  },
+  {
+    term: "DDR5",
+    category: "Memory",
+    definition:
+      "Double Data Rate 5 — current RAM standard. Runs at 4800–8000+ MT/s with on-die ECC. Requires AM5 or LGA1700.",
+    matters:
+      "Higher bandwidth than DDR4. The standard for new builds in 2024+.",
+  },
+  {
+    term: "DDR4",
+    category: "Memory",
+    definition:
+      "Previous RAM standard running at 2133–4800 MT/s. Still supported on older platforms.",
+    matters:
+      "No reason to choose DDR4 for a new build. DDR5 is the current standard.",
+  },
+  {
+    term: "Dual Channel",
+    category: "Memory",
+    definition:
+      "Installing RAM in matched pairs in A2+B2 slots doubles the memory bus from 64-bit to 128-bit.",
+    matters:
+      "Free doubling of memory bandwidth. Always install RAM in pairs in the correct slots.",
+  },
+  {
+    term: "XMP",
+    category: "Memory",
+    definition:
+      "Extreme Memory Profile — Intel's specification for enabling RAM to run above JEDEC base speeds via BIOS profile.",
+    matters:
+      "Without XMP enabled, your 6000MHz kit runs at 4800MHz. Always enable XMP in BIOS.",
+  },
+  {
+    term: "EXPO",
+    category: "Memory",
+    definition:
+      "Extended Profiles for Overclocking — AMD's equivalent of XMP for AM5 platforms.",
+    matters:
+      "Same as XMP but for AMD. Enable EXPO in BIOS to get advertised RAM speeds.",
+  },
+  {
+    term: "CAS Latency",
+    category: "Memory",
+    definition:
+      "CL — the number of clock cycles between a memory request and data delivery. Lower is faster.",
+    matters:
+      "CL30 at 6000MHz is faster than CL40 at 6000MHz. Both speed and latency matter.",
+  },
+  {
+    term: "ECC",
+    category: "Memory",
+    definition:
+      "Error-Correcting Code memory — detects and corrects single-bit errors automatically.",
+    matters:
+      "Essential for servers and workstations. Prevents rare but catastrophic memory errors in critical systems.",
+  },
+  {
+    term: "JEDEC",
+    category: "Memory",
+    definition:
+      "The industry standard body that defines base memory specifications. DDR5-4800 is the JEDEC base spec.",
+    matters: "JEDEC speeds are what RAM runs at without XMP/EXPO enabled.",
+  },
+
+  // Storage
+  {
+    term: "NVMe",
+    category: "Storage",
+    definition:
+      "Non-Volatile Memory Express — a protocol for SSDs using PCIe lanes. Much faster than SATA.",
+    matters:
+      "PCIe 4.0 NVMe reaches 7,000 MB/s vs 550 MB/s for SATA. Use NVMe for your OS and games.",
+  },
+  {
+    term: "SATA",
+    category: "Storage",
+    definition:
+      'Serial ATA — a storage interface capped at ~550 MB/s. Used by 2.5" SSDs and HDDs.',
+    matters:
+      "Obsolete for primary storage but fine for bulk data. HDDs still use SATA.",
+  },
+  {
+    term: "SSD",
+    category: "Storage",
+    definition:
+      "Solid State Drive — flash-based storage with no moving parts. Fast, silent, and shock-resistant.",
+    matters:
+      "Transforms system responsiveness. An SSD is the single biggest upgrade for an old PC.",
+  },
+  {
+    term: "HDD",
+    category: "Storage",
+    definition:
+      "Hard Disk Drive — magnetic spinning platter storage. Slow but offers high capacity at low cost per GB.",
+    matters:
+      "Best for bulk storage (photos, backups, media) where speed is not critical.",
+  },
+  {
+    term: "NAND",
+    category: "Storage",
+    definition:
+      "The flash memory type used in SSDs. Types include TLC (3 bits/cell), QLC (4 bits/cell), and MLC (2 bits/cell).",
+    matters:
+      "TLC offers the best balance of speed, endurance, and cost for consumer SSDs.",
+  },
+  {
+    term: "M.2",
+    category: "Storage",
+    definition:
+      "A compact form factor for SSDs that plugs directly into the motherboard. Supports both NVMe and SATA.",
+    matters:
+      "No cable clutter and CPU-direct connection for NVMe. Always check if slot is NVMe or SATA-only.",
+  },
+  {
+    term: "TBW",
+    category: "Storage",
+    definition:
+      "TeraBytes Written — the total data a drive is rated to write before wear becomes a concern.",
+    matters:
+      "A 600 TBW drive writing 200GB/day lasts ~8 years. Consumer SSDs rarely fail from wear.",
+  },
+  {
+    term: "DRAM Cache",
+    category: "Storage",
+    definition:
+      "A small DRAM chip on the SSD used to store the Flash Translation Layer for faster random access.",
+    matters:
+      "DRAM-less SSDs are slower for sustained random writes. Check for DRAM cache on budget drives.",
+  },
+
+  // Power
+  {
+    term: "PSU",
+    category: "Power",
+    definition:
+      "Power Supply Unit — converts 120/240V AC wall power into DC rails (12V, 5V, 3.3V) for components.",
+    matters:
+      "A failing PSU can destroy other components. Buy quality: Seasonic, Corsair RMx, or be690x.",
+  },
+  {
+    term: "80 Plus",
+    category: "Power",
+    definition:
+      "An efficiency certification. Gold = 87-92% efficient. Platinum = 90-94%. Titanium = 92-96%.",
+    matters:
+      "Higher efficiency = less heat waste and lower electricity bills. Gold is the minimum recommended.",
+  },
+  {
+    term: "Modular PSU",
+    category: "Power",
+    definition:
+      "A PSU where cables are detachable — only connect what you need, reducing cable clutter.",
+    matters:
+      "Dramatically improves cable management and airflow. Worth the small price premium.",
+  },
+  {
+    term: "Rail",
+    category: "Power",
+    definition:
+      "A voltage output line from the PSU. The 12V rail powers CPU and GPU; 5V and 3.3V power other components.",
+    matters:
+      "The 12V rail carries most of the load. Check 12V amperage when choosing a PSU.",
+  },
+  {
+    term: "Capacitor",
+    category: "Power",
+    definition:
+      "An energy storage component that smooths voltage fluctuations. PSUs use Japanese capacitors for reliability.",
+    matters:
+      "Cheap PSUs use low-quality capacitors that fail early, risking other components.",
+  },
+
+  // Networking
+  {
+    term: "Ethernet",
+    category: "Networking",
+    definition:
+      "Wired network connection via RJ45 port. 1GbE is standard; 2.5GbE is common on modern boards.",
+    matters:
+      "Always faster and more stable than WiFi for gaming. Use Ethernet when possible.",
+  },
+  {
+    term: "Wi-Fi 6E",
+    category: "Networking",
+    definition:
+      "IEEE 802.11ax extended — adds 6GHz band for less congestion, up to 9.6 Gbps theoretical.",
+    matters:
+      "Best wireless option for gaming if Ethernet is impossible. Requires a Wi-Fi 6E router.",
+  },
+  {
+    term: "Latency",
+    category: "Networking",
+    definition:
+      "The delay between sending a request and receiving a response. Measured in milliseconds (ms).",
+    matters:
+      "Low latency is critical for competitive gaming. Ethernet gives 1-5ms vs WiFi's 5-50ms+.",
+  },
+  {
+    term: "Bandwidth",
+    category: "Networking",
+    definition:
+      "The maximum data transfer rate of a connection. Measured in Mbps or Gbps.",
+    matters:
+      "Streaming 4K needs ~25Mbps. Most homes are bandwidth-limited by ISP, not hardware.",
+  },
+
+  // Display
+  {
+    term: "Refresh Rate",
+    category: "Display",
+    definition:
+      "How many times per second the monitor redraws its image. 60Hz, 144Hz, 240Hz, 360Hz are common.",
+    matters:
+      "Higher refresh rate = smoother motion. 144Hz is the competitive gaming minimum.",
+  },
+  {
+    term: "Response Time",
+    category: "Display",
+    definition:
+      "How fast a pixel changes color, measured in ms. Lower = less motion blur and ghosting.",
+    matters:
+      "1ms GtG is ideal for fast-paced gaming. IPS panels are now competitive with TN here.",
+  },
+  {
+    term: "IPS",
+    category: "Display",
+    definition:
+      "In-Plane Switching — LCD panel technology with excellent color accuracy and wide viewing angles.",
+    matters:
+      "Best all-around panel for most users. Good color + 1ms response in modern versions.",
+  },
+  {
+    term: "TN",
+    category: "Display",
+    definition:
+      "Twisted Nematic — the oldest LCD type. Fast response but poor color and viewing angles.",
+    matters:
+      "Largely replaced by fast IPS. Only advantage is lowest possible input lag at high refresh rates.",
+  },
+  {
+    term: "VA",
+    category: "Display",
+    definition:
+      "Vertical Alignment — LCD type with the best contrast ratio (3000:1+) but slower response times.",
+    matters:
+      "Best for dark room gaming and movies. Ghosting is a concern in fast games.",
+  },
+  {
+    term: "OLED",
+    category: "Display",
+    definition:
+      "Organic LED — self-emissive pixels that turn fully off. Infinite contrast, instant response, perfect blacks.",
+    matters:
+      "Best display technology available. Risk of burn-in on static content but largely mitigated in modern panels.",
+  },
+  {
+    term: "HDR",
+    category: "Display",
+    definition:
+      "High Dynamic Range — wider luminance range between darkest and brightest points. DisplayHDR 1000 = 1000 nits peak.",
+    matters:
+      'True HDR requires 600+ nits. Most "HDR" monitors are HDR400 which is barely better than SDR.',
+  },
+  {
+    term: "G-Sync",
+    category: "Display",
+    definition:
+      "NVIDIA's adaptive sync technology syncing monitor refresh rate to GPU frame rate, eliminating tearing.",
+    matters:
+      "Eliminates screen tearing without V-Sync input lag. G-Sync Compatible works with any FreeSync monitor.",
+  },
+  {
+    term: "FreeSync",
+    category: "Display",
+    definition:
+      'AMD\'s open adaptive sync standard. Works with NVIDIA GPUs as "G-Sync Compatible" on certified panels.',
+    matters:
+      "Same benefit as G-Sync at lower cost. Most monitors use FreeSync today.",
+  },
+  {
+    term: "Resolution",
+    category: "Display",
+    definition:
+      "The number of pixels: 1080p (1920×1080), 1440p (2560×1440), 4K (3840×2160).",
+    matters:
+      "Higher resolution = sharper image but requires more GPU power. 1440p is the sweet spot for gaming.",
+  },
+  {
+    term: "Pixel Density",
+    category: "Display",
+    definition:
+      'Pixels per inch (PPI). Higher PPI = sharper image. 27" 4K = 163 PPI; 27" 1440p = 109 PPI.',
+    matters:
+      "Below 90 PPI individual pixels become visible. Match resolution to monitor size.",
+  },
+
+  // General
+  {
+    term: "POST",
+    category: "General",
+    definition:
+      "Power-On Self-Test — the BIOS routine that checks hardware (CPU, RAM, GPU) before handing off to the OS.",
+    matters:
+      "Failed POST means a component is missing or broken. Debug LEDs and Q-Codes help identify the problem.",
+  },
+  {
+    term: "BIOS",
+    category: "General",
+    definition:
+      "Basic Input/Output System — firmware stored on a ROM chip that initializes hardware and boots the OS.",
+    matters:
+      "Configure XMP, fan curves, boot order, and overclocking here. Modern BIOS is UEFI.",
+  },
+  {
+    term: "UEFI",
+    category: "General",
+    definition:
+      "Unified Extensible Firmware Interface — the modern BIOS replacement with GUI, mouse support, and Secure Boot.",
+    matters:
+      "Required for Windows 11. Supports drives larger than 2TB. Replaces legacy BIOS.",
+  },
+  {
+    term: "Thermal Paste",
+    category: "General",
+    definition:
+      "A thermally conductive compound filling microscopic gaps between CPU IHS and cooler base.",
+    matters:
+      "Bad or dried thermal paste adds 10-20°C to CPU temps. Replace every 3-5 years.",
+  },
+  {
+    term: "PCIe Lane",
+    category: "General",
+    definition:
+      "A single bidirectional serial link in the PCIe bus. x1 = 1 lane, x4 = 4 lanes, x16 = 16 lanes.",
+    matters:
+      "GPUs use x16 lanes. Running a GPU at x8 causes minimal performance loss (<5%).",
+  },
+  {
+    term: "Bottleneck",
+    category: "General",
+    definition:
+      "When one component limits the performance of another — most commonly CPU limiting GPU utilisation in games.",
+    matters:
+      "A balanced system maximises performance. Check GPU usage — if below 90% under load, you may be CPU-bottlenecked.",
+  },
+  {
+    term: "Bandwidth",
+    category: "General",
+    definition:
+      "The maximum data transfer rate between two components. Measured in GB/s for internal connections.",
+    matters:
+      "Memory bandwidth affects CPU performance. PCIe bandwidth affects GPU and NVMe performance.",
+  },
+  {
+    term: "Latency",
+    category: "General",
+    definition:
+      "The delay between requesting and receiving data. Lower is better. Measured in nanoseconds for RAM.",
+    matters:
+      "RAM latency affects CPU performance more than raw bandwidth in many workloads.",
+  },
+  {
+    term: "Form Factor",
+    category: "General",
+    definition:
+      'Physical size standard: ATX, mATX, ITX for motherboards; 3.5", 2.5", M.2 for storage.',
+    matters:
+      "Must match your case. Mini-ITX builds sacrifice expansion slots for compact size.",
+  },
+  {
+    term: "CMOS",
+    category: "General",
+    definition:
+      "Complementary Metal-Oxide Semiconductor — a small SRAM chip powered by a coin cell battery storing BIOS settings.",
+    matters:
+      "Removing the CMOS battery resets all BIOS settings. Useful for troubleshooting POST failures.",
+  },
+  {
+    term: "Thermal Throttling",
+    category: "General",
+    definition:
+      "Automatic CPU/GPU clock reduction when temperatures exceed safe limits to prevent damage.",
+    matters:
+      "Throttling destroys performance. Fix with better cooling or repasted cooler.",
+  },
+  {
+    term: "RGB",
+    category: "General",
+    definition:
+      "Red Green Blue LEDs embedded in components and cases for aesthetic lighting effects.",
+    matters:
+      "No performance impact. Adds 0-2% to component costs. Unified via ASUS Aura, MSI Mystic Light, etc.",
+  },
+  {
+    term: "Wattage",
+    category: "General",
+    definition:
+      "The rate of electrical power consumption. A 450W GPU draws 450 joules of energy per second.",
+    matters:
+      "Sum all component wattages and add 20% headroom to choose PSU size.",
+  },
+  {
+    term: "Voltage",
+    category: "General",
+    definition:
+      "Electrical potential difference driving current through circuits. CPUs operate at ~1.0-1.4V core voltage.",
+    matters:
+      "Overvoltage degrades CPU/RAM lifespan. Undervolting reduces heat with no performance loss.",
+  },
+];
+
+const CATEGORIES: Category[] = [
+  "CPU",
+  "GPU",
+  "Memory",
+  "Storage",
+  "Power",
+  "Networking",
+  "Display",
+  "General",
+];
+
+const CATEGORY_COLORS: Record<Category, string> = {
+  CPU: "#E8631A",
+  GPU: "#76b900",
+  Memory: "#5b9bd5",
+  Storage: "#aa44ff",
+  Power: "#ffcc22",
+  Networking: "#22ccaa",
+  Display: "#ff44aa",
+  General: "#aaaaaa",
+};
+
+const LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
+
+export default function Glossary() {
+  const [search, setSearch] = useState("");
+  const [activeCategory, setActiveCategory] = useState<Category | null>(null);
+  const [activeLetter, setActiveLetter] = useState<string | null>(null);
+  const letterRefs = useRef<Record<string, HTMLDivElement | null>>({});
+
+  const filtered = useMemo(() => {
+    return TERMS.filter((t) => {
+      const matchCat = !activeCategory || t.category === activeCategory;
+      const matchLetter =
+        !activeLetter || t.term[0].toUpperCase() === activeLetter;
+      const q = search.toLowerCase();
+      const matchSearch =
+        !q ||
+        t.term.toLowerCase().includes(q) ||
+        t.definition.toLowerCase().includes(q) ||
+        t.matters.toLowerCase().includes(q);
+      return matchCat && matchLetter && matchSearch;
+    }).sort((a, b) => a.term.localeCompare(b.term));
+  }, [search, activeCategory, activeLetter]);
+
+  const availableLetters = useMemo(() => {
+    return new Set(TERMS.map((t) => t.term[0].toUpperCase()));
+  }, []);
+
+  const scrollToLetter = (letter: string) => {
+    setActiveLetter(letter === activeLetter ? null : letter);
+  };
+
+  const tagStyle = (active: boolean, color: string) => ({
+    padding: "4px 12px",
+    fontFamily: "monospace",
+    fontSize: "10px",
+    borderRadius: "5px",
+    cursor: "pointer",
+    border: active ? `1px solid ${color}` : "1px solid rgba(255,255,255,.1)",
+    background: active ? `${color}22` : "none",
+    color: active ? color : "rgba(180,210,240,.5)",
+  });
+
+  return (
+    <div
+      style={{
+        minHeight: "100vh",
+        background: "#0d1420",
+        fontFamily: "monospace",
+        color: "#ddeeff",
+        padding: "32px 24px",
+      }}
+    >
+      {/* Header */}
+      <div style={{ marginBottom: "28px" }}>
+        <div
+          style={{
+            fontSize: "9px",
+            letterSpacing: ".14em",
+            color: "rgba(91,155,213,.6)",
+            marginBottom: "6px",
+          }}
+        >
+          HARDWARE DICTIONARY
+        </div>
+        <h1
+          style={{
+            fontSize: "24px",
+            fontWeight: 700,
+            color: "#ddeeff",
+            margin: "0 0 4px",
+          }}
+        >
+          Glossary
+        </h1>
+        <p
+          style={{
+            fontSize: "11px",
+            color: "rgba(180,210,240,.45)",
+            margin: 0,
+          }}
+        >
+          {TERMS.length} hardware terms defined — from basics to advanced
+          concepts.
+        </p>
+      </div>
+
+      {/* Search */}
+      <div style={{ marginBottom: "16px" }}>
+        <input
+          value={search}
+          onChange={(e) => {
+            setSearch(e.target.value);
+            setActiveLetter(null);
+          }}
+          placeholder="Search terms, definitions..."
+          style={{
+            width: "100%",
+            padding: "10px 14px",
+            background: "rgba(255,255,255,.05)",
+            border: "1px solid rgba(91,155,213,.25)",
+            borderRadius: "8px",
+            color: "#ddeeff",
+            fontFamily: "monospace",
+            fontSize: "12px",
+            outline: "none",
+            boxSizing: "border-box",
+          }}
+        />
+      </div>
+
+      {/* Category filters */}
+      <div
+        style={{
+          display: "flex",
+          gap: "6px",
+          marginBottom: "16px",
+          flexWrap: "wrap",
+        }}
+      >
+        <button
+          onClick={() => setActiveCategory(null)}
+          style={tagStyle(!activeCategory, "#5b9bd5")}
+        >
+          All ({TERMS.length})
+        </button>
+        {CATEGORIES.map((cat) => (
+          <button
+            key={cat}
+            onClick={() =>
+              setActiveCategory(activeCategory === cat ? null : cat)
+            }
+            style={tagStyle(activeCategory === cat, CATEGORY_COLORS[cat])}
+          >
+            {cat} ({TERMS.filter((t) => t.category === cat).length})
+          </button>
+        ))}
+      </div>
+
+      {/* A-Z index */}
+      <div
+        style={{
+          display: "flex",
+          gap: "4px",
+          marginBottom: "28px",
+          flexWrap: "wrap",
+        }}
+      >
+        {LETTERS.map((letter) => {
+          const available = availableLetters.has(letter);
+          const active = activeLetter === letter;
+          return (
+            <button
+              key={letter}
+              onClick={() => available && scrollToLetter(letter)}
+              style={{
+                width: "24px",
+                height: "24px",
+                fontFamily: "monospace",
+                fontSize: "10px",
+                borderRadius: "4px",
+                cursor: available ? "pointer" : "default",
+                border: active
+                  ? "1px solid #5b9bd5"
+                  : "1px solid rgba(255,255,255,.06)",
+                background: active
+                  ? "rgba(91,155,213,.2)"
+                  : available
+                    ? "rgba(255,255,255,.04)"
+                    : "none",
+                color: active
+                  ? "#5b9bd5"
+                  : available
+                    ? "rgba(180,210,240,.7)"
+                    : "rgba(180,210,240,.15)",
+                padding: 0,
+              }}
+            >
+              {letter}
+            </button>
+          );
+        })}
+        {activeLetter && (
+          <button
+            onClick={() => setActiveLetter(null)}
+            style={{
+              padding: "0 10px",
+              height: "24px",
+              fontFamily: "monospace",
+              fontSize: "9px",
+              borderRadius: "4px",
+              cursor: "pointer",
+              border: "1px solid rgba(255,100,100,.3)",
+              background: "rgba(255,100,100,.08)",
+              color: "rgba(255,130,130,.8)",
+            }}
+          >
+            ✕ clear
+          </button>
+        )}
+      </div>
+
+      {/* Results count */}
+      <div
+        style={{
+          fontSize: "10px",
+          color: "rgba(180,210,240,.35)",
+          marginBottom: "16px",
+        }}
+      >
+        {filtered.length} term{filtered.length !== 1 ? "s" : ""}
+        {search || activeCategory || activeLetter
+          ? " matching filters"
+          : " total"}
+      </div>
+
+      {/* Terms grid */}
+      {filtered.length === 0 ? (
+        <div
+          style={{
+            textAlign: "center",
+            padding: "40px",
+            color: "rgba(180,210,240,.3)",
+            fontSize: "12px",
+          }}
+        >
+          No terms found matching your search.
+        </div>
+      ) : (
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fill, minmax(340px, 1fr))",
+            gap: "10px",
+          }}
+        >
+          {filtered.map((t) => {
+            const col = CATEGORY_COLORS[t.category];
+            return (
+              <div
+                key={t.term}
+                style={{
+                  background: "rgba(255,255,255,.025)",
+                  border: "1px solid rgba(255,255,255,.07)",
+                  borderRadius: "8px",
+                  padding: "14px 16px",
+                  transition: "border-color .2s",
+                }}
+                onMouseEnter={(e) =>
+                  (e.currentTarget.style.borderColor = `${col}44`)
+                }
+                onMouseLeave={(e) =>
+                  (e.currentTarget.style.borderColor = "rgba(255,255,255,.07)")
+                }
+              >
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "flex-start",
+                    marginBottom: "6px",
+                  }}
+                >
+                  <span
+                    style={{
+                      fontSize: "13px",
+                      fontWeight: 700,
+                      color: "#ddeeff",
+                    }}
+                  >
+                    {t.term}
+                  </span>
+                  <span
+                    style={{
+                      fontSize: "8px",
+                      padding: "2px 7px",
+                      borderRadius: "3px",
+                      background: `${col}22`,
+                      color: col,
+                      letterSpacing: ".08em",
+                      flexShrink: 0,
+                      marginLeft: "8px",
+                    }}
+                  >
+                    {t.category.toUpperCase()}
+                  </span>
+                </div>
+                <p
+                  style={{
+                    fontSize: "11px",
+                    color: "rgba(180,210,240,.7)",
+                    lineHeight: 1.7,
+                    margin: "0 0 8px",
+                  }}
+                >
+                  {t.definition}
+                </p>
+                <div
+                  style={{
+                    fontSize: "10px",
+                    color: col,
+                    lineHeight: 1.6,
+                    paddingTop: "8px",
+                    borderTop: `1px solid ${col}22`,
+                  }}
+                >
+                  💡 {t.matters}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
