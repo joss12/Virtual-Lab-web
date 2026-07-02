@@ -1,36 +1,108 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+<div align="center">
 
-## Getting Started
+# vlab_
 
-First, run the development server:
+**See inside the machine.**
+
+A virtual computer lab — interactive 3D hardware, guided coding projects that run in your browser, and study tracks from silicon to SQL.
+
+[Live demo](#) · [Built by eddymouity.dev](https://eddymouity.dev)
+
+<!-- Screenshot: drop a capture of the landing page here -->
+<!-- ![vlab landing page](docs/screenshot-landing.png) -->
+
+</div>
+
+---
+
+## What is vlab?
+
+vlab teaches how computers actually work — no degree needed. Every PC component is explained with interactive 3D models and real-time data flow visualization, then reinforced with quizzes, guided projects, and a leaderboard to keep you honest.
+
+**Core areas:**
+
+- 🔩 **Study** — deep guides for 10 components, keyboard to GPU
+- 🖥️ **3D Lab** — an interactive motherboard with live data flow and power visualization
+- 🧠 **OS & Databases** — how software meets the hardware
+- 💻 **Learn** — Python, JavaScript, and SQL tracks with an in-browser code runner (no install, no server round-trip)
+- 🛠️ **Guided projects** — step-by-step builds with starter code and expected output
+- ❓ **Quiz, Glossary, Specs, Benchmarks, Fix** — test, look up, compare, troubleshoot
+- 🏆 **Leaderboard & progress tracking** — synced to your account
+
+## How the in-browser code runner works
+
+Code executes entirely client-side — nothing is sent to a server:
+
+| Language   | Engine                                   |
+| ---------- | ---------------------------------------- |
+| Python     | [Pyodide](https://pyodide.org) (WebAssembly CPython) |
+| JavaScript | Sandboxed `Function` with captured console |
+| SQL        | [sql.js](https://sql.js.org) (SQLite compiled to WASM) |
+
+Engines are lazy-loaded from CDN only when a lesson needs them.
+
+## Tech stack
+
+- **Framework:** Next.js 16 (App Router, Turbopack)
+- **Language:** TypeScript
+- **Styling:** Tailwind CSS
+- **i18n:** next-intl — full English 🇬🇧 / French 🇫🇷 support
+- **State:** Zustand
+- **Content:** Markdown lessons rendered with react-markdown + remark-gfm
+- **Auth & data:** JWT auth against a separate REST API (deployed on Render)
+
+## Getting started
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
+# 1. Clone
+git clone https://github.com/joss12/vlab-web.git
+cd vlab-web
+
+# 2. Install
+pnpm install
+
+# 3. Configure environment
+cp .env.example .env.local
+# then set NEXT_PUBLIC_API_URL to your backend URL
+
+# 4. Run
 pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000) — you'll be redirected to your locale (`/en` or `/fr`).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### Production build
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+pnpm build
+pnpm start
+```
 
-## Learn More
+## Project structure
 
-To learn more about Next.js, take a look at the following resources:
+```
+src/
+├── app/[locale]/        # localized routes (study, lab, quiz, learn, ...)
+│   └── learn/[language]/  # lesson tracks + guided projects
+├── components/          # UI (layout, lab, ...)
+├── content/             # lesson & project content
+├── i18n/                # next-intl request config
+├── lib/                 # API client, helpers
+├── messages/            # en.json / fr.json translations
+├── store/               # Zustand stores
+└── types/               # shared global type declarations
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Roadmap
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+- [ ] More guided projects per language track
+- [ ] Additional locales
+- [ ] Expanded 3D lab scenarios
 
-## Deploy on Vercel
+---
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+<div align="center">
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Built with ☕ by [Eddy](https://eddymouity.dev) · © 2026 vlab
+
+</div>

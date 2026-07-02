@@ -1,20 +1,34 @@
-import { NextRequest, NextResponse } from "next/server";
+import { type NextRequest, NextResponse } from "next/server";
+import createMiddleware from "next-intl/middleware";
+import { routing } from "./i18n/routing";
 
-const PROTECTED = ["/quiz", "/lab", "/profile"];
+const intlMiddleware = createMiddleware(routing);
 
-export function middleware(request: NextRequest) {
-  const token = request.cookies.get("token")?.value;
+const PROTECTED_ROUTES = ["/quiz", "/lab", "/profile", "/os", "/dashboard"];
+
+export default function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  const isProtected = PROTECTED.some((path) => pathname.startsWith(path));
+  const pathnameWithoutLocale = pathname.replace(/^\/(en|fr)(?=\/|$)/, "") || "/";
 
-  if (isProtected && !token) {
-    return NextResponse.redirect(new URL("/auth/login", request.url));
+  const isProtected = PROTECTED_ROUTES.some((route) =>
+    pathnameWithoutLocale === route ||
+    pathnameWithoutLocale.startsWith(`${route}/`),
+  );
+
+  if (isProtected) {
+    const token = request.cookies.get("token")?.value;
+
+    if (!token) {
+      const loginUrl = new URL("/auth/login", request.url);
+
+      return NextResponse.redirect(loginUrl);
+    }
   }
 
-  return NextResponse.next();
+  return intlMiddleware(request);
 }
 
 export const config = {
-  matcher: ["/quiz", "/lab", "/profile"],
+  matcher: ["/((?!api|_next/static|_next/image|favicon.ico|.*\\..*).*)"],
 };

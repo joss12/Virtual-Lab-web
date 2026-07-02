@@ -1,8 +1,10 @@
 "use client";
 
+import Link from "next/link";
 import { useState, useEffect, useCallback } from "react";
 import { useAuthStore } from "@/store/useAuthStore";
 import { api } from "@/lib/api";
+import { useTranslations, useLocale } from "next-intl";
 
 interface LeaderboardEntry {
   rank: number;
@@ -10,6 +12,7 @@ interface LeaderboardEntry {
   score: number;
   total: number;
   created_at: string;
+  avatar_url: string;
 }
 
 function getEmailFromToken(token: string | null): string | null {
@@ -24,8 +27,8 @@ function getEmailFromToken(token: string | null): string | null {
 
 const MEDALS = ["🥇", "🥈", "🥉"];
 
-function formatDate(iso: string) {
-  return new Date(iso).toLocaleDateString("en-US", {
+function formatDate(iso: string, locale: string) {
+  return new Date(iso).toLocaleDateString(locale === "fr" ? "fr-FR" : "en-US", {
     month: "short",
     day: "numeric",
     year: "numeric",
@@ -84,6 +87,9 @@ export default function Leaderboard() {
 
   const { token, isAuthenticated } = useAuthStore();
   const myEmail = getEmailFromToken(token);
+  const t = useTranslations("leaderboard");
+  const tCommon = useTranslations("common");
+  const locale = useLocale();
 
   const fetchLeaderboard = useCallback(async () => {
     setLoading(true);
@@ -93,11 +99,11 @@ export default function Leaderboard() {
       setEntries(res.data);
       setLastUpdated(new Date());
     } catch {
-      setError("Could not load leaderboard. Try again.");
+      setError(t("error"));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     fetchLeaderboard();
@@ -137,8 +143,9 @@ export default function Leaderboard() {
               marginBottom: "6px",
             }}
           >
-            GLOBAL RANKINGS
+            {t("globalRankings").toUpperCase()}
           </div>
+
           <h1
             style={{
               fontSize: "24px",
@@ -147,8 +154,9 @@ export default function Leaderboard() {
               margin: "0 0 4px",
             }}
           >
-            Leaderboard
+            {t("title")}
           </h1>
+
           <p
             style={{
               fontSize: "11px",
@@ -156,9 +164,10 @@ export default function Leaderboard() {
               margin: 0,
             }}
           >
-            Top 10 quiz scores across all players.
+            {t("subtitle")}
           </p>
         </div>
+
         <div
           style={{
             display: "flex",
@@ -182,11 +191,14 @@ export default function Leaderboard() {
               opacity: loading ? 0.5 : 1,
             }}
           >
-            {loading ? "Loading..." : "↻ Refresh"}
+            {loading ? tCommon("loading") : `↻ ${t("refresh")}`}
           </button>
+
           {lastUpdated && (
             <span style={{ fontSize: "9px", color: "rgba(180,210,240,.3)" }}>
-              Updated {lastUpdated.toLocaleTimeString()}
+              {lastUpdated.toLocaleTimeString(
+                locale === "fr" ? "fr-FR" : "en-US",
+              )}
             </span>
           )}
         </div>
@@ -209,6 +221,7 @@ export default function Leaderboard() {
           <span style={{ fontSize: "18px" }}>
             {MEDALS[myBestScore.rank - 1] ?? "🏅"}
           </span>
+
           <div>
             <div
               style={{
@@ -217,11 +230,12 @@ export default function Leaderboard() {
                 marginBottom: "2px",
               }}
             >
-              YOUR BEST SCORE
+              {t("yourBestScore").toUpperCase()}
             </div>
+
             <div style={{ fontSize: "13px", color: "#ddeeff" }}>
-              Rank #{myBestScore.rank} — {myBestScore.score}/{myBestScore.total}{" "}
-              correct (
+              {t("rank")} #{myBestScore.rank} — {myBestScore.score}/
+              {myBestScore.total} (
               {Math.round((myBestScore.score / myBestScore.total) * 100)}%)
             </div>
           </div>
@@ -240,7 +254,7 @@ export default function Leaderboard() {
             color: "rgba(180,210,240,.5)",
           }}
         >
-          You are not on the leaderboard yet. Take the quiz to get ranked!
+          {t("notRanked")}
         </div>
       )}
 
@@ -256,13 +270,13 @@ export default function Leaderboard() {
             color: "rgba(180,210,240,.5)",
           }}
         >
-          <a
-            href="/auth/login"
+          <Link
+            href={`/${locale}/auth/login`}
             style={{ color: "#5b9bd5", textDecoration: "none" }}
           >
-            Log in
-          </a>{" "}
-          to see your rank and save scores.
+            {t("loginPrompt")}
+          </Link>{" "}
+          {t("loginMessage")}
         </div>
       )}
 
@@ -308,7 +322,7 @@ export default function Leaderboard() {
             fontSize: "12px",
           }}
         >
-          No scores yet. Be the first to take the quiz!
+          {t("noScores")}
         </div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
@@ -324,11 +338,11 @@ export default function Leaderboard() {
               color: "rgba(91,155,213,.5)",
             }}
           >
-            <span>RANK</span>
-            <span>PLAYER</span>
-            <span>SCORE</span>
-            <span>PCT</span>
-            <span>DATE</span>
+            <span>{t("rank").toUpperCase()}</span>
+            <span>{t("player").toUpperCase()}</span>
+            <span>{t("score").toUpperCase()}</span>
+            <span>{t("pct").toUpperCase()}</span>
+            <span>{t("date").toUpperCase()}</span>
           </div>
 
           {entries.map((entry, i) => {
@@ -349,7 +363,13 @@ export default function Leaderboard() {
                     : i === 0
                       ? "rgba(255,215,0,.05)"
                       : "rgba(255,255,255,.025)",
-                  border: `1px solid ${isMe ? "rgba(91,155,213,.4)" : i === 0 ? "rgba(255,215,0,.2)" : "rgba(255,255,255,.06)"}`,
+                  border: `1px solid ${
+                    isMe
+                      ? "rgba(91,155,213,.4)"
+                      : i === 0
+                        ? "rgba(255,215,0,.2)"
+                        : "rgba(255,255,255,.06)"
+                  }`,
                   borderRadius: "8px",
                   alignItems: "center",
                 }}
@@ -373,26 +393,42 @@ export default function Leaderboard() {
                 </div>
 
                 {/* Player */}
-                <div>
-                  <div
+                <div
+                  style={{ display: "flex", alignItems: "center", gap: "10px" }}
+                >
+                  <img
+                    src={entry.avatar_url}
+                    alt=""
                     style={{
-                      fontSize: "12px",
-                      color: isMe ? "#5b9bd5" : "#ddeeff",
-                      fontWeight: isMe ? 700 : 400,
+                      width: "28px",
+                      height: "28px",
+                      borderRadius: "50%",
+                      background: "rgba(255,255,255,.05)",
                     }}
-                  >
-                    {maskEmail(entry.email)}
-                    {isMe && (
-                      <span
-                        style={{
-                          marginLeft: "6px",
-                          fontSize: "9px",
-                          color: "#5b9bd5",
-                        }}
-                      >
-                        YOU
-                      </span>
-                    )}
+                  />
+
+                  <div>
+                    <div
+                      style={{
+                        fontSize: "12px",
+                        color: isMe ? "#5b9bd5" : "#ddeeff",
+                        fontWeight: isMe ? 700 : 400,
+                      }}
+                    >
+                      {maskEmail(entry.email)}
+
+                      {isMe && (
+                        <span
+                          style={{
+                            marginLeft: "6px",
+                            fontSize: "9px",
+                            color: "#5b9bd5",
+                          }}
+                        >
+                          YOU
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
 
@@ -415,7 +451,7 @@ export default function Leaderboard() {
                 <div
                   style={{ fontSize: "10px", color: "rgba(180,210,240,.4)" }}
                 >
-                  {formatDate(entry.created_at)}
+                  {formatDate(entry.created_at, locale)}
                 </div>
               </div>
             );
@@ -432,7 +468,7 @@ export default function Leaderboard() {
           textAlign: "center",
         }}
       >
-        Top 10 scores · Emails partially hidden for privacy
+        {t("footer")}
       </div>
     </div>
   );

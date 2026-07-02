@@ -35,3 +35,5 @@ export interface UpdateProgressRequest {
   tabs_visited: string[];
   completed: boolean;
 }
+
+

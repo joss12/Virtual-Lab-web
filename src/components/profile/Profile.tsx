@@ -1,8 +1,10 @@
 "use client";
 
+import Link from "next/link";
 import { useState, useEffect } from "react";
 import { useAuthStore } from "@/store/useAuthStore";
 import { api } from "@/lib/api";
+import { useTranslations, useLocale } from "next-intl";
 
 interface QuizScore {
   id: string;
@@ -19,38 +21,8 @@ interface Progress {
   updated_at: string;
 }
 
-function getEmailFromToken(token: string | null): string | null {
-  if (!token) return null;
-  try {
-    const payload = JSON.parse(atob(token.split(".")[1]));
-    return payload.email ?? null;
-  } catch {
-    return null;
-  }
-}
-
-function getMemberSince(token: string | null): string | null {
-  if (!token) return null;
-  try {
-    const payload = JSON.parse(atob(token.split(".")[1]));
-    const iat = payload.iat;
-    if (!iat) return null;
-    return new Date(iat * 1000).toLocaleDateString("en-US", {
-      month: "long",
-      year: "numeric",
-    });
-  } catch {
-    return null;
-  }
-}
-
-function getInitials(email: string | null): string {
-  if (!email) return "?";
-  return email[0].toUpperCase();
-}
-
-function formatDate(iso: string) {
-  return new Date(iso).toLocaleDateString("en-US", {
+function formatDate(iso: string, locale: string) {
+  return new Date(iso).toLocaleDateString(locale === "fr" ? "fr-FR" : "en-US", {
     month: "short",
     day: "numeric",
     year: "numeric",
@@ -60,6 +32,7 @@ function formatDate(iso: string) {
 function ScoreBar({ score, total }: { score: number; total: number }) {
   const pct = Math.round((score / total) * 100);
   const color = pct >= 80 ? "#44cc88" : pct >= 60 ? "#ffcc22" : "#ff6622";
+
   return (
     <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
       <div
@@ -95,10 +68,14 @@ function ScoreBar({ score, total }: { score: number; total: number }) {
 }
 
 export default function Profile() {
-  const { token, logout } = useAuthStore();
-  const email = getEmailFromToken(token);
-  const memberSince = getMemberSince(token);
-  const initials = getInitials(email);
+  const { logout } = useAuthStore();
+  const t = useTranslations("profile");
+  const tCommon = useTranslations("common");
+  const locale = useLocale();
+
+  const [email, setEmail] = useState<string | null>(null);
+  const [avatarURL, setAvatarURL] = useState<string | null>(null);
+  const [memberSince, setMemberSince] = useState<string | null>(null);
 
   const [scores, setScores] = useState<QuizScore[]>([]);
   const [progress, setProgress] = useState<Progress[]>([]);
@@ -114,6 +91,17 @@ export default function Profile() {
   const [pwError, setPwError] = useState<string | null>(null);
 
   useEffect(() => {
+    api.get("/me").then((r) => {
+      setEmail(r.data.email);
+      setAvatarURL(r.data.avatar_url);
+      setMemberSince(
+        new Date(r.data.created_at).toLocaleDateString(
+          locale === "fr" ? "fr-FR" : "en-US",
+          { month: "long", year: "numeric" },
+        ),
+      );
+    });
+
     api
       .get("/quiz/scores")
       .then((r) => {
@@ -129,12 +117,13 @@ export default function Profile() {
         setLoadingProgress(false);
       })
       .catch(() => setLoadingProgress(false));
-  }, []);
+  }, [locale]);
 
   const bestScore =
     scores.length > 0
       ? Math.max(...scores.map((s) => Math.round((s.score / s.total) * 100)))
       : null;
+
   const avgScore =
     scores.length > 0
       ? Math.round(
@@ -142,37 +131,45 @@ export default function Profile() {
             scores.length,
         )
       : null;
+
   const completedComponents = progress.filter((p) => p.completed).length;
   const totalComponents = 10;
 
   const handleChangePassword = async () => {
     setPwError(null);
     setPwSuccess(false);
+
     if (!currentPassword || !newPassword || !confirmPassword) {
-      setPwError("All fields are required.");
+      setPwError(t("allFieldsRequired"));
       return;
     }
+
     if (newPassword.length < 8) {
-      setPwError("New password must be at least 8 characters.");
+      setPwError(t("passwordMin"));
       return;
     }
+
     if (newPassword !== confirmPassword) {
-      setPwError("New passwords do not match.");
+      setPwError(t("passwordMismatch"));
       return;
     }
+
     setPwLoading(true);
+
     try {
       await api.put("/auth/password", {
         current_password: currentPassword,
         new_password: newPassword,
       });
+
       setPwSuccess(true);
       setCurrentPassword("");
       setNewPassword("");
       setConfirmPassword("");
+
       setTimeout(() => setShowPasswordForm(false), 2000);
     } catch (e: any) {
-      setPwError(e?.response?.data?.error ?? "Could not update password.");
+      setPwError(e?.response?.data?.error ?? tCommon("error"));
     } finally {
       setPwLoading(false);
     }
@@ -201,7 +198,6 @@ export default function Profile() {
         padding: "32px 24px",
       }}
     >
-      {/* Header */}
       <div style={{ marginBottom: "32px" }}>
         <div
           style={{
@@ -211,8 +207,9 @@ export default function Profile() {
             marginBottom: "6px",
           }}
         >
-          ACCOUNT
+          {t("account").toUpperCase()}
         </div>
+
         <h1
           style={{
             fontSize: "24px",
@@ -221,7 +218,7 @@ export default function Profile() {
             margin: 0,
           }}
         >
-          Profile
+          {t("title")}
         </h1>
       </div>
 
@@ -233,9 +230,7 @@ export default function Profile() {
           alignItems: "start",
         }}
       >
-        {/* Left column */}
         <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-          {/* Avatar card */}
           <div
             style={{
               background: "rgba(255,255,255,.03)",
@@ -245,23 +240,31 @@ export default function Profile() {
               textAlign: "center",
             }}
           >
-            <div
-              style={{
-                width: "72px",
-                height: "72px",
-                borderRadius: "50%",
-                background: "linear-gradient(135deg, #0066cc, #00aaff)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                margin: "0 auto 14px",
-                fontSize: "28px",
-                fontWeight: 700,
-                color: "white",
-              }}
-            >
-              {initials}
-            </div>
+            {avatarURL ? (
+              <img
+                src={avatarURL}
+                alt="avatar"
+                style={{
+                  width: "72px",
+                  height: "72px",
+                  borderRadius: "50%",
+                  margin: "0 auto 14px",
+                  display: "block",
+                  background: "rgba(255,255,255,.05)",
+                }}
+              />
+            ) : (
+              <div
+                style={{
+                  width: "72px",
+                  height: "72px",
+                  borderRadius: "50%",
+                  margin: "0 auto 14px",
+                  background: "rgba(255,255,255,.05)",
+                }}
+              />
+            )}
+
             <div
               style={{
                 fontSize: "13px",
@@ -273,6 +276,7 @@ export default function Profile() {
             >
               {email}
             </div>
+
             <div
               style={{
                 fontSize: "10px",
@@ -280,8 +284,9 @@ export default function Profile() {
                 marginBottom: "16px",
               }}
             >
-              Member since {memberSince}
+              {tCommon("memberSince", { date: memberSince ?? "" })}
             </div>
+
             <button
               onClick={logout}
               style={{
@@ -296,11 +301,10 @@ export default function Profile() {
                 cursor: "pointer",
               }}
             >
-              Log out
+              {t("logOut")}
             </button>
           </div>
 
-          {/* Stats card */}
           <div
             style={{
               background: "rgba(255,255,255,.03)",
@@ -317,20 +321,21 @@ export default function Profile() {
                 marginBottom: "14px",
               }}
             >
-              STATS
+              {t("stats").toUpperCase()}
             </div>
+
             {[
-              { label: "Quiz attempts", value: scores.length },
+              { label: t("quizAttempts"), value: scores.length },
               {
-                label: "Best score",
+                label: t("bestScore"),
                 value: bestScore !== null ? `${bestScore}%` : "—",
               },
               {
-                label: "Average score",
+                label: t("averageScore"),
                 value: avgScore !== null ? `${avgScore}%` : "—",
               },
               {
-                label: "Components studied",
+                label: t("componentsStudied"),
                 value: `${completedComponents}/${totalComponents}`,
               },
             ].map(({ label, value }) => (
@@ -348,6 +353,7 @@ export default function Profile() {
                 >
                   {label}
                 </span>
+
                 <span
                   style={{
                     fontSize: "11px",
@@ -361,7 +367,6 @@ export default function Profile() {
             ))}
           </div>
 
-          {/* Security card */}
           <div
             style={{
               background: "rgba(255,255,255,.03)",
@@ -385,8 +390,9 @@ export default function Profile() {
                   color: "rgba(91,155,213,.5)",
                 }}
               >
-                SECURITY
+                {t("security").toUpperCase()}
               </div>
+
               <button
                 onClick={() => {
                   setShowPasswordForm(!showPasswordForm);
@@ -407,7 +413,7 @@ export default function Profile() {
                   color: "#5b9bd5",
                 }}
               >
-                {showPasswordForm ? "Cancel" : "Change password"}
+                {showPasswordForm ? tCommon("cancel") : t("changePassword")}
               </button>
             </div>
 
@@ -417,25 +423,28 @@ export default function Profile() {
               >
                 <input
                   type="password"
-                  placeholder="Current password"
+                  placeholder={t("currentPassword")}
                   value={currentPassword}
                   onChange={(e) => setCurrentPassword(e.target.value)}
                   style={inputStyle}
                 />
+
                 <input
                   type="password"
-                  placeholder="New password"
+                  placeholder={t("newPassword")}
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
                   style={inputStyle}
                 />
+
                 <input
                   type="password"
-                  placeholder="Confirm new password"
+                  placeholder={t("confirmPassword")}
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   style={inputStyle}
                 />
+
                 {pwError && (
                   <div
                     style={{ fontSize: "10px", color: "rgba(255,120,120,.9)" }}
@@ -443,11 +452,13 @@ export default function Profile() {
                     {pwError}
                   </div>
                 )}
+
                 {pwSuccess && (
                   <div style={{ fontSize: "10px", color: "#44cc88" }}>
-                    ✓ Password updated successfully
+                    ✓ {t("passwordUpdated")}
                   </div>
                 )}
+
                 <button
                   onClick={handleChangePassword}
                   disabled={pwLoading}
@@ -464,16 +475,14 @@ export default function Profile() {
                     marginTop: "4px",
                   }}
                 >
-                  {pwLoading ? "Updating..." : "Update password"}
+                  {pwLoading ? t("updating") : t("updatePassword")}
                 </button>
               </div>
             )}
           </div>
         </div>
 
-        {/* Right column */}
         <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-          {/* Quiz history */}
           <div
             style={{
               background: "rgba(255,255,255,.03)",
@@ -490,8 +499,9 @@ export default function Profile() {
                 marginBottom: "14px",
               }}
             >
-              QUIZ HISTORY
+              {t("quizHistory").toUpperCase()}
             </div>
+
             {loadingScores ? (
               <div
                 style={{ display: "flex", flexDirection: "column", gap: "8px" }}
@@ -515,13 +525,13 @@ export default function Profile() {
                   padding: "12px 0",
                 }}
               >
-                No quiz attempts yet.{" "}
-                <a
-                  href="/quiz"
+                {t("noQuizYet")}{" "}
+                <Link
+                  href={`/${locale}/quiz`}
                   style={{ color: "#5b9bd5", textDecoration: "none" }}
                 >
-                  Take the quiz →
-                </a>
+                  {t("takeQuiz")}
+                </Link>
               </div>
             ) : (
               <div
@@ -542,10 +552,12 @@ export default function Profile() {
                   <span>SCORE</span>
                   <span>RESULT</span>
                 </div>
+
                 {scores.map((s, i) => {
                   const pct = Math.round((s.score / s.total) * 100);
                   const color =
                     pct >= 80 ? "#44cc88" : pct >= 60 ? "#ffcc22" : "#ff6622";
+
                   return (
                     <div
                       key={s.id ?? i}
@@ -565,9 +577,11 @@ export default function Profile() {
                           color: "rgba(180,210,240,.6)",
                         }}
                       >
-                        {formatDate(s.created_at)}
+                        {formatDate(s.created_at, locale)}
                       </span>
+
                       <ScoreBar score={s.score} total={s.total} />
+
                       <span
                         style={{ fontSize: "12px", fontWeight: 700, color }}
                       >
@@ -580,7 +594,6 @@ export default function Profile() {
             )}
           </div>
 
-          {/* Study progress */}
           <div
             style={{
               background: "rgba(255,255,255,.03)",
@@ -597,8 +610,9 @@ export default function Profile() {
                 marginBottom: "14px",
               }}
             >
-              STUDY PROGRESS
+              {t("studyProgress").toUpperCase()}
             </div>
+
             {loadingProgress ? (
               <div
                 style={{ display: "flex", flexDirection: "column", gap: "8px" }}
@@ -622,13 +636,13 @@ export default function Profile() {
                   padding: "12px 0",
                 }}
               >
-                No study activity yet.{" "}
-                <a
-                  href="/study"
+                {t("noStudyYet")}{" "}
+                <Link
+                  href={`/${locale}/study`}
                   style={{ color: "#5b9bd5", textDecoration: "none" }}
                 >
-                  Start studying →
-                </a>
+                  {t("startStudying")}
+                </Link>
               </div>
             ) : (
               <div
@@ -641,6 +655,7 @@ export default function Profile() {
                     : tabPct >= 60
                       ? "#ffcc22"
                       : "#5b9bd5";
+
                   return (
                     <div key={p.component ?? i}>
                       <div
@@ -659,6 +674,7 @@ export default function Profile() {
                         >
                           {p.component.replace(/-/g, " ")}
                         </span>
+
                         <div
                           style={{
                             display: "flex",
@@ -679,11 +695,13 @@ export default function Profile() {
                               COMPLETE
                             </span>
                           )}
+
                           <span style={{ fontSize: "10px", color }}>
                             {p.tabs_visited.length}/5 tabs
                           </span>
                         </div>
                       </div>
+
                       <div
                         style={{
                           height: "4px",
